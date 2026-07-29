@@ -147,7 +147,7 @@ class Level:
                 0, 0, 0
             )
             edge_actor.GetProperty().SetLineWidth(
-                2.0
+                2.2
             )
             edge_mapper.SetResolveCoincidentTopologyToPolygonOffset()
 

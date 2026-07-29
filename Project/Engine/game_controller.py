@@ -46,10 +46,7 @@ class GameController(QObject):
 
         self.physics_dt = 1.0 / 60.0
 
-        self.max_physics_steps = 2
-
         self.accumulator = 0.0
-
 
         self.alpha = 0.0
 
@@ -167,6 +164,7 @@ class GameController(QObject):
 
         self.hit = self.raycast_triangle_cache(
             self.player.active_meshes, 
+            self.player.position,
             self.player.triangle_cache,
             cam_pos, 
             cam_look
@@ -402,17 +400,6 @@ class GameController(QObject):
         self.collision_meshes = collision_meshes
 
 
-    def stop(self):
-
-        if self.timer:
-
-            self.timer.stop()
-
-            self.timer.deleteLater()
-
-            self.timer = None
-
-
     def ray_triangle_intersection(
         self,
         origin,
@@ -421,6 +408,30 @@ class GameController(QObject):
         v1,
         v2
     ):
+        for name, vertex in (
+            ("v0", v0),
+            ("v1", v1),
+            ("v2", v2)
+        ):
+
+            if (
+                not isinstance(vertex, np.ndarray)
+                or vertex.shape != (3,)
+                or vertex.size != 3
+            ):
+
+                print(
+                    "BAD TRIANGLE VERTEX:",
+                    name,
+                    "value:",
+                    vertex,
+                    "shape:",
+                    getattr(vertex, "shape", None),
+                    "size:",
+                    getattr(vertex, "size", None)
+                )
+
+                return None
 
         epsilon = 1e-8
 
@@ -485,10 +496,11 @@ class GameController(QObject):
     def raycast_triangle_cache(
         self,
         active_meshes,
+        player_pos,
         triangle_cache,
         origin,
         direction,
-        max_distance=20
+        max_distance=1.5
     ):
         direction = direction/np.linalg.norm(direction)
         for layer_index,layer in enumerate(triangle_cache):
@@ -496,6 +508,14 @@ class GameController(QObject):
             for mesh_id, tri_id in layer:
 
                 mesh = active_meshes[mesh_id]
+
+                tri_center = mesh.tri_centers[tri_id]
+
+                if np.linalg.norm(
+                    tri_center - player_pos
+                ) > max_distance:
+                    continue
+
                 vertices = mesh.vertices
 
                 triangle_ids = mesh.tri_vertex_indices[tri_id]
@@ -518,7 +538,7 @@ class GameController(QObject):
                 ):
                     tri_normal = mesh.tri_normals[tri_id]
 
-                    epsilon = 0.01
+                    epsilon = 0.005
 
                     v0 = v0 + tri_normal * epsilon
                     v1 = v1 + tri_normal * epsilon
@@ -530,4 +550,14 @@ class GameController(QObject):
 
         return None
 
-    
+
+    def stop(self):
+
+            if self.timer:
+
+                self.timer.stop()
+
+                self.timer.deleteLater()
+
+                self.timer = None
+

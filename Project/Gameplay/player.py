@@ -12,7 +12,7 @@ class Player:
         self.current_triangle_key = (start_mesh_id, start_triangle_id)
         self.active_meshes = None
         self.triangle_cache = []
-        self.depth = 10
+        self.depth = 15
         self.move_speed = 0.7
         self.turn_speed = 80
         
@@ -454,51 +454,64 @@ class Player:
         self,
     ):
 
+        mesh_id, tri_id = self.current_triangle_key
+
+        mesh = self.active_meshes[mesh_id]
+
+        connections = mesh.tri_connections[tri_id]
 
         candidates = 0
-        tested = 0
 
-        for layer_id, layer in enumerate(self.triangle_cache):
+        for connection in connections:
+
+            neighbor_mesh_id, neighbor_tri_id = connection
+
+            if (
+                neighbor_mesh_id is None
+                or neighbor_mesh_id < 0
+            ):
+                continue
 
 
-            for triangle_key in layer:
+            neighbor_key = (
+                neighbor_mesh_id,
+                neighbor_tri_id
+            )
 
-                tested += 1
+            candidates += 1
 
-                bary = self.world_to_barycentric(
-                    self.position,
-                    triangle_key
+
+            bary = self.world_to_barycentric(
+                self.position,
+                neighbor_key
+            )
+
+            inside = (
+                np.all(bary >= -1e-4)
+                and
+                np.all(bary <= 1.0001)
+            )
+
+
+            if inside:
+
+                return (
+                    neighbor_key,
+                    bary
                 )
 
-                inside = (
-                    np.all(bary >= -1e-4)
-                    and
-                    np.all(bary <= 1.0001)
-                )
 
-
-                if inside:
-
-                    candidates += 1
-
-                    if triangle_key != self.current_triangle_key:
-                        
-                        
-                        return (
-                            triangle_key,
-                            bary
-                        )
-                    
         self.debug_print(
-            "\nERROR: No triangle found at exit point.",
-            f"\nTriangles Tested : {tested}",
-            f"\nCandidates Found : {candidates}",
+            "\nERROR: No connected triangle found at exit point.",
             f"\nCurrent Triangle : {self.current_triangle_key}",
             f"\nPosition         : {self.position}",
-            f"\nBarycentric      : {self.barycentric}"
+            f"\nBarycentric      : {self.barycentric}",
+            f"\nNeighbor Count   : {candidates}"
         )
 
+
         return None
+
     
     def move_forward(self, velocity, dt):
         remaining_distance = velocity * dt
@@ -535,7 +548,7 @@ class Player:
 
                 self.debug_player_state("MOVEMENT FAILURE")
                 break
-
+            
             self.current_triangle_key, self.barycentric = result
             self.position = self.barycentric_to_world(
                 self.barycentric,

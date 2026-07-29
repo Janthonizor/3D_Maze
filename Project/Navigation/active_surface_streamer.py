@@ -91,6 +91,14 @@ class ActiveSurfaceStreamer:
                 -1
             ]
 
+            discard_mesh.tri_connections[
+                triB_id,
+                2
+            ] = [
+                -1,
+                -1
+            ]
+
     def initialize_active_meshes(self):
 
         current_mesh = self.create_mesh(self.current_node_id)

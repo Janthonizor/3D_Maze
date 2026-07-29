@@ -24,7 +24,7 @@ class Renderer:
  
         self.selected_triangle_actor = None
         self.selected_triangle_key = None
-        self.render_distance = 3
+        self.render_distance = 2
 
         self.maze_map = maze_map
 

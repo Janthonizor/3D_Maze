@@ -121,7 +121,7 @@ class Camera:
         input_state,
         dt
     ):
-        sensitivity = 0.18
+        sensitivity = 0.15
 
         self.target_yaw -= (
             input_state["mouse_dx"] * sensitivity
@@ -137,15 +137,18 @@ class Camera:
 
         smooth_speed = 20.0
 
+        alpha = 1.0 - np.exp(
+            -smooth_speed * dt
+        )
+
         self.yaw += (
             self.target_yaw - self.yaw
-        ) * smooth_speed * dt
+        ) * alpha
 
 
         self.pitch += (
             self.target_pitch - self.pitch
-        ) * smooth_speed * dt
-
+        ) * alpha
 
 
         self.pitch = np.clip(
@@ -591,68 +594,6 @@ class Camera:
             self.up
         )
 
-    @staticmethod
-    def rotate( vector, axis, angle):
-
-        axis = axis / np.linalg.norm(axis)
-
-        cos_theta = np.cos(angle)
-        sin_theta = np.sin(angle)
-
-        return (
-            vector * cos_theta
-            +
-            np.cross(axis, vector) * sin_theta
-            +
-            axis * np.dot(axis, vector) * (1 - cos_theta)
-        )
-    
-    @staticmethod
-    def build_euler_matrix(angles):
-        """
-        Build XYZ Euler rotation matrix.
-
-        angles:
-            [rx, ry, rz] in degrees
-
-        Returns:
-            3x3 rotation matrix
-        """
-
-        rx, ry, rz = np.deg2rad(angles)
-
-        cx = np.cos(rx)
-        sx = np.sin(rx)
-
-        cy = np.cos(ry)
-        sy = np.sin(ry)
-
-        cz = np.cos(rz)
-        sz = np.sin(rz)
-
-
-        Rx = np.array([
-            [1, 0, 0],
-            [0, cx, -sx],
-            [0, sx, cx]
-        ])
-
-        Ry = np.array([
-            [cy, 0, sy],
-            [0, 1, 0],
-            [-sy, 0, cy]
-        ])
-
-        Rz = np.array([
-            [cz, -sz, 0],
-            [sz, cz, 0],
-            [0, 0, 1]
-        ])
-
-
-        # same order as renderer
-        return Rz @ Ry @ Rx
-
     def save_previous_render_state(self):
 
         self.previous_position_frame = (
@@ -722,4 +663,68 @@ class Camera:
             "up": up,
             "forward": forward
         }
+
     
+    @staticmethod
+    def rotate( vector, axis, angle):
+
+        axis = axis / np.linalg.norm(axis)
+
+        cos_theta = np.cos(angle)
+        sin_theta = np.sin(angle)
+
+        return (
+            vector * cos_theta
+            +
+            np.cross(axis, vector) * sin_theta
+            +
+            axis * np.dot(axis, vector) * (1 - cos_theta)
+        )
+
+    
+    @staticmethod
+    def build_euler_matrix(angles):
+        """
+        Build XYZ Euler rotation matrix.
+
+        angles:
+            [rx, ry, rz] in degrees
+
+        Returns:
+            3x3 rotation matrix
+        """
+
+        rx, ry, rz = np.deg2rad(angles)
+
+        cx = np.cos(rx)
+        sx = np.sin(rx)
+
+        cy = np.cos(ry)
+        sy = np.sin(ry)
+
+        cz = np.cos(rz)
+        sz = np.sin(rz)
+
+
+        Rx = np.array([
+            [1, 0, 0],
+            [0, cx, -sx],
+            [0, sx, cx]
+        ])
+
+        Ry = np.array([
+            [cy, 0, sy],
+            [0, 1, 0],
+            [-sy, 0, cy]
+        ])
+
+        Rz = np.array([
+            [cz, -sz, 0],
+            [sz, cz, 0],
+            [0, 0, 1]
+        ])
+
+
+        # same order as renderer
+        return Rz @ Ry @ Rx
+
