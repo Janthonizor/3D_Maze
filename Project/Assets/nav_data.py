@@ -7,6 +7,7 @@ class NavData:
         tri_vertex_indices,
         tri_normals,
         tri_centers,
+        tri_connections,
         boundary_triangles
     ):
         self.node_key = node_key
@@ -15,4 +16,5 @@ class NavData:
         self.tri_vertex_indices = tri_vertex_indices
         self.tri_normals = tri_normals
         self.tri_centers = tri_centers
+        self.tri_connections = tri_connections
         self.boundary_triangles = boundary_triangles

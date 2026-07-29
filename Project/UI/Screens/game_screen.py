@@ -300,9 +300,6 @@ class GameScreen(QWidget):
             )
 
 
-        print(
-            f"INVENTORY toggled | game_mode={self.game_mode} | previous_game_mode={self.previous_game_mode}"
-        )
 
 
 
@@ -324,10 +321,6 @@ class GameScreen(QWidget):
             )
 
 
-        print(
-            f"MENU toggled | game_mode={self.game_mode} | previous_game_mode={self.previous_game_mode}"
-        )
-
     def restore_game_focus(self):
 
         self.game_plotter.setFocus(
@@ -340,17 +333,8 @@ class GameScreen(QWidget):
         key = event.key()
 
 
-        print(
-            "KEY:",
-            event.key(),
-            "FOCUS:",
-            self.focusWidget()
-        )
-
 
         if key == Qt.Key_Escape:
-
-            print("ESC pressed")
 
             self.toggle_menu()
 
@@ -360,8 +344,6 @@ class GameScreen(QWidget):
 
 
         if key == Qt.Key_Tab:
-
-            print("TAB pressed")
 
             self.toggle_inventory()
 
@@ -432,12 +414,8 @@ class GameScreen(QWidget):
 
     def debug_focus_change(self, old, new):
 
-        print(
-            "FOCUS CHANGE:",
-            old,
-            "->",
-            new
-        )
+        pass
+    
     def focusInEvent(self, event):
 
         self.game_plotter.setFocus(

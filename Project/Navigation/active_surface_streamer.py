@@ -49,21 +49,15 @@ class ActiveSurfaceStreamer:
 
         for triA_id, triB_id in zip(A, B):
 
-            adjacent_mesh.tri_connections[
-                triA_id,
-                2
-            ] = [
+            adjacent_mesh.tri_connections[triA_id][2] = (
                 new_mesh.mesh_id,
                 triB_id
-            ]
+            )
 
-            new_mesh.tri_connections[
-                triB_id,
-                2
-            ] = [
+            new_mesh.tri_connections[triB_id][2] = (
                 adjacent_mesh.mesh_id,
                 triA_id
-            ]
+            )
 
     def unstitch_mesh(
         self,
@@ -83,21 +77,15 @@ class ActiveSurfaceStreamer:
 
         for triA_id, triB_id in zip(A, B):
 
-            adjacent_mesh.tri_connections[
-                triA_id,
-                2
-            ] = [
+            adjacent_mesh.tri_connections[triA_id][2] = (
                 -1,
                 -1
-            ]
+            )
 
-            discard_mesh.tri_connections[
-                triB_id,
-                2
-            ] = [
+            discard_mesh.tri_connections[triB_id][2] = (
                 -1,
                 -1
-            ]
+            )
 
     def initialize_active_meshes(self):
 

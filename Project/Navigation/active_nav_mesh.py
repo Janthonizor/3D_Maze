@@ -45,10 +45,18 @@ class ActiveNavMesh:
         self.tri_connections = (
             nav_data.tri_connections.copy()
         )
-
+        
         mask = self.tri_connections[:,:,1] >= 0
 
         self.tri_connections[:,:,0][mask] = mesh_id
+
+        self.tri_connections = [
+            [
+                tuple(connection)
+                for connection in tri_connections
+            ]
+            for tri_connections in self.tri_connections
+        ]
 
         self.boundary_triangles = [
             [

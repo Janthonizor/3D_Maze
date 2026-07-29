@@ -81,6 +81,7 @@ class Camera:
         self.previous_forward_frame = None
         self.current_forward_frame = self.forward.copy()
 
+
     def initialize_frame(
             self,
             player_frame
@@ -114,8 +115,7 @@ class Camera:
             self.previous_forward_frame = self.forward.copy()
             self.current_forward_frame = self.forward.copy()
 
-   
-    
+     
     def update_input(
         self,
         input_state,
@@ -188,11 +188,13 @@ class Camera:
 
         self.solve_camera()
 
+
     def solve_camera(self):
 
         self.solve_camera_position()
 
         self.solve_camera_orientation()
+
 
     def solve_camera_position(self):
 
@@ -234,6 +236,7 @@ class Camera:
             +
             up * self.height_offset
         )
+
 
     def solve_camera_orientation(self):
 
@@ -287,6 +290,7 @@ class Camera:
             self.look_distance
         )
 
+
     def update_radius(
         self,
         dt
@@ -314,6 +318,7 @@ class Camera:
             *
             self.target_radius
         )
+
 
     def solve_collision(
         self,
@@ -519,6 +524,7 @@ class Camera:
 
         self.update_position_from_radius()
 
+
     def update_radius_from_collision(
         self,
         collision_distances
@@ -558,6 +564,7 @@ class Camera:
             self.max_radius
         )
 
+
     def update_position_from_radius(self):
 
         up = self.player_up / np.linalg.norm(self.player_up)
@@ -585,6 +592,7 @@ class Camera:
             +
             up * self.height_offset
         )
+
             
     def get_frame(self):
 
@@ -593,6 +601,7 @@ class Camera:
             self.look_at,
             self.up
         )
+
 
     def save_previous_render_state(self):
 
@@ -608,6 +617,7 @@ class Camera:
             self.current_up_frame.copy()
         )
 
+
     def update_render_state(self):
 
         self.current_position_frame = (
@@ -621,6 +631,7 @@ class Camera:
         self.current_up_frame = (
             self.up.copy()
         )
+
 
     def get_interpolated_frame(self, alpha):
 

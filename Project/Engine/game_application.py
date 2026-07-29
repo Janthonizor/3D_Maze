@@ -285,6 +285,8 @@ class GameApplication(QObject):
 
         self.show_game()
 
+        self.input_manager.enable()
+
 
     def on_game_finished(self, results):
 

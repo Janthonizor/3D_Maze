@@ -1,4 +1,5 @@
 from Navigation.active_surface_streamer import ActiveSurfaceStreamer
+from Navigation.triangle_query import TriangleQuery
 from Gameplay.player import Player
 from Gameplay.camera import Camera
 from PyQt5.QtCore import QTimer, Qt, QObject, pyqtSignal
@@ -44,6 +45,8 @@ class GameController(QObject):
             self.current_node
         )
 
+        self.triangle_query = None
+
         self.physics_dt = 1.0 / 60.0
 
         self.accumulator = 0.0
@@ -65,14 +68,13 @@ class GameController(QObject):
 
         self.surface.initialize_active_meshes()
 
+        self.triangle_query = TriangleQuery(self.surface)
+
         self.player = Player(
+            self.triangle_query,
             0,
             self.current_node,
             [1/3, 1/3, 1/3]
-        )
-
-        self.player.set_active_meshes(
-            self.surface.active_meshes
         )
 
         self.player.create_frame()
@@ -159,15 +161,18 @@ class GameController(QObject):
             self.player.get_frame(),
             dt
         )
+
         cam_look = self.renderer.plotter.camera.GetDirectionOfProjection()
         cam_pos = self.renderer.plotter.camera.position
 
-        self.hit = self.raycast_triangle_cache(
-            self.player.active_meshes, 
-            self.player.position,
-            self.player.triangle_cache,
+        self.hit = self.raycast_surface(
+            self.triangle_query,
+            self.player.current_tri,
             cam_pos, 
-            cam_look
+            cam_look,
+            20,
+            1.0,
+            self.player.position
         )
 
         self.camera_collision_timer += dt
@@ -404,39 +409,13 @@ class GameController(QObject):
         self,
         origin,
         direction,
-        v0,
-        v1,
-        v2
+        vertices
     ):
-        for name, vertex in (
-            ("v0", v0),
-            ("v1", v1),
-            ("v2", v2)
-        ):
-
-            if (
-                not isinstance(vertex, np.ndarray)
-                or vertex.shape != (3,)
-                or vertex.size != 3
-            ):
-
-                print(
-                    "BAD TRIANGLE VERTEX:",
-                    name,
-                    "value:",
-                    vertex,
-                    "shape:",
-                    getattr(vertex, "shape", None),
-                    "size:",
-                    getattr(vertex, "size", None)
-                )
-
-                return None
 
         epsilon = 1e-8
 
-        edge1 = v1 - v0
-        edge2 = v2 - v0
+        edge1 = vertices[1] - vertices[0]
+        edge2 = vertices[2] - vertices[0]
 
         h = np.cross(
             direction,
@@ -448,24 +427,20 @@ class GameController(QObject):
             h
         )
 
-        # ray parallel to triangle
         if abs(a) < epsilon:
             return None
 
-
         f = 1.0 / a
 
-        s = origin - v0
+        s = origin - vertices[0]
 
         u = f * np.dot(
             s,
             h
         )
 
-
         if u < 0 or u > 1:
             return None
-
 
         q = np.cross(
             s,
@@ -477,10 +452,8 @@ class GameController(QObject):
             q
         )
 
-
         if v < 0 or u + v > 1:
             return None
-
 
         # distance along ray
         distance = f * np.dot(
@@ -488,65 +461,60 @@ class GameController(QObject):
             q
         )
 
-
         if distance > epsilon:
             return distance
 
+        return None
 
-    def raycast_triangle_cache(
+
+    def raycast_surface(
         self,
-        active_meshes,
-        player_pos,
-        triangle_cache,
+        triangle_query,
+        root_triangle,
         origin,
         direction,
-        max_distance=1.5
+        max_depth,
+        max_distance,
+        cull_position = None
     ):
+        if cull_position is None:
+
+            cull_position = origin
+
         direction = direction/np.linalg.norm(direction)
-        for layer_index,layer in enumerate(triangle_cache):
 
-            for mesh_id, tri_id in layer:
+        triangle_cache = triangle_query.get_cache(root_triangle, max_depth)
 
-                mesh = active_meshes[mesh_id]
+        for _ , layer in enumerate(triangle_cache):
 
-                tri_center = mesh.tri_centers[tri_id]
+            for triangle in layer:
 
-                if np.linalg.norm(
-                    tri_center - player_pos
-                ) > max_distance:
+                tri_center = triangle_query.get_tri_center(triangle)
+
+                dist_from_target = np.linalg.norm(tri_center - cull_position)
+
+                if dist_from_target > max_distance:
                     continue
 
-                vertices = mesh.vertices
-
-                triangle_ids = mesh.tri_vertex_indices[tri_id]
-
-                v0 = vertices[triangle_ids[0]]
-                v1 = vertices[triangle_ids[1]]
-                v2 = vertices[triangle_ids[2]]
+                vertices = triangle_query.get_tri_verts(triangle)
 
                 distance = self.ray_triangle_intersection(
                     origin,
                     direction,
-                    v0,
-                    v1,
-                    v2
+                    vertices
                 )
 
-                if (
-                    distance is not None
-                    and distance <= max_distance
-                ):
-                    tri_normal = mesh.tri_normals[tri_id]
+                if distance == None:
+                    continue
 
-                    epsilon = 0.005
+                tri_normal = triangle_query.get_tri_norm(triangle)
 
-                    v0 = v0 + tri_normal * epsilon
-                    v1 = v1 + tri_normal * epsilon
-                    v2 = v2 + tri_normal * epsilon
-                    return (
-                        mesh_id,
-                        tri_id
-                    ), v0, v1, v2
+                epsilon = 0.005
+
+                lifted_vertices = vertices + tri_normal * epsilon
+
+
+                return triangle, lifted_vertices
 
         return None
 

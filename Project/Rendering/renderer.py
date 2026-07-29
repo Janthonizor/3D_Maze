@@ -249,7 +249,7 @@ class Renderer:
         self,
         raycast_result
     ):
-
+        
         # -------------------------
         # No selection
         # -------------------------
@@ -276,7 +276,7 @@ class Renderer:
         # -------------------------
 
         if self.selected_triangle_actor is None:
-            print("problem")
+            print("no actor")
             points = vtk.vtkPoints()
             points.InsertNextPoint(0, 0, 0)
             points.InsertNextPoint(0, 0, 0)
@@ -350,11 +350,8 @@ class Renderer:
             self.plotter.add_actor(
                 actor
             )
-            
-        
 
-
-        (_, _), v0, v1, v2 = raycast_result
+        vertices = raycast_result[1]
 
         
         polydata = (
@@ -366,21 +363,9 @@ class Renderer:
 
         points = polydata.GetPoints()
 
-        points.SetPoint(
-            0,
-            *v0
-        )
+        for i in range(len(vertices)):
 
-        points.SetPoint(
-            1,
-            *v1
-        )
-
-        points.SetPoint(
-            2,
-            *v2
-        )
-
+            points.SetPoint(i, *vertices[i])
 
         points.Modified()
 
@@ -391,6 +376,7 @@ class Renderer:
         # Show highlight
         # -------------------------
         self.selected_triangle_key = raycast_result[0]
+        
         self.selected_triangle_actor.VisibilityOn()
 
     def update_visible_nodes(

@@ -102,7 +102,6 @@ def boundary_loop_to_polydata(triangles, nav_data):
     )
 
 
-
 # -----------------------------
 # Boundary colors
 # -----------------------------
