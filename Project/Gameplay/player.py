@@ -12,7 +12,7 @@ class Player:
         self.current_triangle_key = (start_mesh_id, start_triangle_id)
         self.active_meshes = None
         self.triangle_cache = []
-        self.depth = 6
+        self.depth = 10
         self.move_speed = 0.7
         self.turn_speed = 80
         

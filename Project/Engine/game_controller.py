@@ -3,6 +3,7 @@ from Gameplay.player import Player
 from Gameplay.camera import Camera
 from PyQt5.QtCore import QTimer, Qt, QObject, pyqtSignal
 import time
+import numpy as np
 
 class GameController(QObject):
     
@@ -34,6 +35,8 @@ class GameController(QObject):
         self.current_node = 0
 
         self.visible_nodes = set()
+
+        self.hit = None
 
 
         self.surface = ActiveSurfaceStreamer(
@@ -159,6 +162,15 @@ class GameController(QObject):
             self.player.get_frame(),
             dt
         )
+        cam_look = self.renderer.plotter.camera.GetDirectionOfProjection()
+        cam_pos = self.renderer.plotter.camera.position
+
+        self.hit = self.raycast_triangle_cache(
+            self.player.active_meshes, 
+            self.player.triangle_cache,
+            cam_pos, 
+            cam_look
+        )
 
         self.camera_collision_timer += dt
 
@@ -173,6 +185,7 @@ class GameController(QObject):
 
         self.camera.update_render_state()
 
+
     def render_step(self):
 
         self.renderer.update_frame(
@@ -182,6 +195,10 @@ class GameController(QObject):
             self.camera.get_interpolated_frame(
                 self.alpha
             )
+        )
+
+        self.renderer.update_triangle_highlight_actor(
+            self.hit
         )
 
 
@@ -194,12 +211,7 @@ class GameController(QObject):
         )
 
 
-
-
-
     def tick(self):
-
-
 
         current_time = time.perf_counter()
 
@@ -213,6 +225,7 @@ class GameController(QObject):
 
 
         self.accumulator += frame_time
+
 
 
         input_state = self.get_input()
@@ -235,7 +248,7 @@ class GameController(QObject):
 
             physics_count += 1
 
-
+        
 
         self.alpha = (
             self.accumulator
@@ -245,10 +258,6 @@ class GameController(QObject):
 
         self.render_step()
 
-
-
-
-        
 
     def get_input(self):
 
@@ -338,7 +347,6 @@ class GameController(QObject):
         self.update_renderer_visibility()
 
 
-
     def get_visible_nodes(self):
 
         layers, _ = self.level.maze_map.get_stream_tree(
@@ -393,6 +401,7 @@ class GameController(QObject):
 
         self.collision_meshes = collision_meshes
 
+
     def stop(self):
 
         if self.timer:
@@ -402,3 +411,123 @@ class GameController(QObject):
             self.timer.deleteLater()
 
             self.timer = None
+
+
+    def ray_triangle_intersection(
+        self,
+        origin,
+        direction,
+        v0,
+        v1,
+        v2
+    ):
+
+        epsilon = 1e-8
+
+        edge1 = v1 - v0
+        edge2 = v2 - v0
+
+        h = np.cross(
+            direction,
+            edge2
+        )
+
+        a = np.dot(
+            edge1,
+            h
+        )
+
+        # ray parallel to triangle
+        if abs(a) < epsilon:
+            return None
+
+
+        f = 1.0 / a
+
+        s = origin - v0
+
+        u = f * np.dot(
+            s,
+            h
+        )
+
+
+        if u < 0 or u > 1:
+            return None
+
+
+        q = np.cross(
+            s,
+            edge1
+        )
+
+        v = f * np.dot(
+            direction,
+            q
+        )
+
+
+        if v < 0 or u + v > 1:
+            return None
+
+
+        # distance along ray
+        distance = f * np.dot(
+            edge2,
+            q
+        )
+
+
+        if distance > epsilon:
+            return distance
+
+
+    def raycast_triangle_cache(
+        self,
+        active_meshes,
+        triangle_cache,
+        origin,
+        direction,
+        max_distance=20
+    ):
+        direction = direction/np.linalg.norm(direction)
+        for layer_index,layer in enumerate(triangle_cache):
+
+            for mesh_id, tri_id in layer:
+
+                mesh = active_meshes[mesh_id]
+                vertices = mesh.vertices
+
+                triangle_ids = mesh.tri_vertex_indices[tri_id]
+
+                v0 = vertices[triangle_ids[0]]
+                v1 = vertices[triangle_ids[1]]
+                v2 = vertices[triangle_ids[2]]
+
+                distance = self.ray_triangle_intersection(
+                    origin,
+                    direction,
+                    v0,
+                    v1,
+                    v2
+                )
+
+                if (
+                    distance is not None
+                    and distance <= max_distance
+                ):
+                    tri_normal = mesh.tri_normals[tri_id]
+
+                    epsilon = 0.01
+
+                    v0 = v0 + tri_normal * epsilon
+                    v1 = v1 + tri_normal * epsilon
+                    v2 = v2 + tri_normal * epsilon
+                    return (
+                        mesh_id,
+                        tri_id
+                    ), v0, v1, v2
+
+        return None
+
+    

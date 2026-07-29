@@ -14,13 +14,16 @@ class Renderer:
     ):
 
         self.plotter = plotter
+        self.foreground_renderer = None
+        self.create_foreground_renderer()
         
         self.plotter.ren_win.SetSize(
             1600,
             900
         )
  
-
+        self.selected_triangle_actor = None
+        self.selected_triangle_key = None
         self.render_distance = 3
 
         self.maze_map = maze_map
@@ -36,8 +39,29 @@ class Renderer:
         self.player_forward_arrow = None
         self.player_offset = 0.2
 
+        self.reticle = None
+        self.reticle_base_points = np.array([
+            [-0.2,0,0],
+            [0.2,0,0],
+            [0,-0.2,0],
+            [0, 0.2,0],
+            [-1,0,0],
+            [1,0,0],
+            [0,-1,0],
+            [0,1,0]
+        ])
+        self.reticle_points = None
+
         self.snail = assets.snail
         self.snail_parts = []
+
+    def create_foreground_renderer(self):
+        self.foreground_renderer = vtk.vtkRenderer()
+        self.foreground_renderer.SetLayer(1)
+        self.plotter.ren_win.SetNumberOfLayers(2)
+        self.plotter.ren_win.AddRenderer(
+            self.foreground_renderer
+        )
 
     def create_player_actor(self):
         
@@ -50,6 +74,99 @@ class Renderer:
                 specular_power=part["material"]["specular_power"]
             )
             self.snail_parts.append(actor)
+
+    def initialize_reticle(self):
+
+        self.reticle_points = vtk.vtkPoints()
+
+        # center
+        for point in self.reticle_base_points:
+            self.reticle_points.InsertNextPoint(
+                *point
+            )
+
+
+        lines = vtk.vtkCellArray()
+
+        line = vtk.vtkLine()
+        line.GetPointIds().SetId(0, 0)
+        line.GetPointIds().SetId(1, 4)
+        lines.InsertNextCell(line)
+
+        line = vtk.vtkLine()
+        line.GetPointIds().SetId(0, 1)
+        line.GetPointIds().SetId(1, 5)
+        lines.InsertNextCell(line)
+
+        line = vtk.vtkLine()
+        line.GetPointIds().SetId(0, 2)
+        line.GetPointIds().SetId(1, 6)
+        lines.InsertNextCell(line)
+
+        line = vtk.vtkLine()
+        line.GetPointIds().SetId(0, 3)
+        line.GetPointIds().SetId(1, 7)
+        lines.InsertNextCell(line)
+
+
+        polydata = vtk.vtkPolyData()
+
+        polydata.SetPoints(self.reticle_points)
+        polydata.SetLines(lines)
+
+
+        mapper = vtk.vtkPolyDataMapper2D()
+
+        mapper.SetInputData(
+            polydata
+        )
+
+
+        self.reticle = vtk.vtkActor2D()
+
+        self.reticle.SetMapper(
+            mapper
+        )
+
+
+        self.reticle.GetProperty().SetColor(
+            1,
+            1,
+            1
+        )
+
+        self.reticle.GetProperty().SetLineWidth(
+            1
+        )
+        self.update_reticle_scale(self.plotter.width(), self.plotter.height())
+
+        width = self.plotter.width()
+
+        height = self.plotter.height()
+
+        self.reticle.SetPosition(
+            width / 2,
+            height / 2
+        )
+
+        self.foreground_renderer.AddActor2D(
+            self.reticle
+        )
+
+    def update_reticle_scale(self, width, height):
+
+        size = min(width, height) * 0.03
+
+        for i, point in enumerate(self.reticle_base_points):
+
+            scaled = point * size
+
+            self.reticle_points.SetPoint(
+                i,
+                *scaled
+            )
+
+        self.reticle_points.Modified()
 
     def update_frame(
         self,
@@ -126,6 +243,155 @@ class Renderer:
 
             count += 1
 
+        self.initialize_reticle()
+
+    def update_triangle_highlight_actor(
+        self,
+        raycast_result
+    ):
+
+        # -------------------------
+        # No selection
+        # -------------------------
+
+        if raycast_result is None:
+
+            if self.selected_triangle_actor is not None:
+
+                self.selected_triangle_actor.VisibilityOff()
+
+            return
+
+        triangle_key = raycast_result[0]
+
+        if (
+            triangle_key == self.selected_triangle_key
+            and self.selected_triangle_actor is not None
+            and self.selected_triangle_actor.GetVisibility()
+        ):  
+            return
+        
+        # -------------------------
+        # Create actor if needed
+        # -------------------------
+
+        if self.selected_triangle_actor is None:
+            print("problem")
+            points = vtk.vtkPoints()
+            points.InsertNextPoint(0, 0, 0)
+            points.InsertNextPoint(0, 0, 0)
+            points.InsertNextPoint(0, 0, 0)
+
+            lines = vtk.vtkCellArray()
+
+            for a, b in [
+                (0, 1),
+                (1, 2),
+                (2, 0)
+            ]:
+
+                line = vtk.vtkLine()
+
+                line.GetPointIds().SetId(
+                    0,
+                    a
+                )
+
+                line.GetPointIds().SetId(
+                    1,
+                    b
+                )
+
+                lines.InsertNextCell(
+                    line
+                )
+
+
+            polydata = vtk.vtkPolyData()
+
+            polydata.SetPoints(
+                points
+            )
+
+            polydata.SetLines(
+                lines
+            )
+
+
+            mapper = vtk.vtkPolyDataMapper()
+
+            mapper.SetInputData(
+                polydata
+            )
+
+            #mapper.SetResolveCoincidentTopologyToPolygonOffset()
+
+            actor = vtk.vtkActor()
+
+            actor.SetMapper(
+                mapper
+            )
+
+
+            actor.GetProperty().SetColor(
+                1,
+                0,
+                0
+            )
+
+            actor.GetProperty().SetLineWidth(
+                3
+            )
+
+            
+
+            self.selected_triangle_actor = actor
+
+            self.plotter.add_actor(
+                actor
+            )
+            
+        
+
+
+        (_, _), v0, v1, v2 = raycast_result
+
+        
+        polydata = (
+            self.selected_triangle_actor
+            .GetMapper()
+            .GetInput()
+        )
+
+
+        points = polydata.GetPoints()
+
+        points.SetPoint(
+            0,
+            *v0
+        )
+
+        points.SetPoint(
+            1,
+            *v1
+        )
+
+        points.SetPoint(
+            2,
+            *v2
+        )
+
+
+        points.Modified()
+
+        polydata.Modified()
+
+
+        # -------------------------
+        # Show highlight
+        # -------------------------
+        self.selected_triangle_key = raycast_result[0]
+        self.selected_triangle_actor.VisibilityOn()
 
     def update_visible_nodes(
         self,
@@ -181,7 +447,21 @@ class Renderer:
         self.plotter.render()
 
     def on_resize(self, width, height):
-        print(width, height)
+
+        self.screen_size = (
+            width,
+            height
+        )
+
+        self.reticle.SetPosition(
+            width / 2,
+            height / 2
+        )
+
+        self.update_reticle_scale(
+            width,
+            height
+        )
 
     @staticmethod
     def orient_actor(
