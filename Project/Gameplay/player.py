@@ -15,9 +15,9 @@ class Player:
 
         self.current_tri = (start_mesh_id, start_triangle_id)
 
-        self.move_speed = 20
+        self.move_speed = 5
 
-        self.turn_speed = 400
+        self.turn_speed = 150
 
         self.forward_n = 0.7
 
