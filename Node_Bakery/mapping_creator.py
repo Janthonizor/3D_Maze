@@ -330,7 +330,8 @@ class MappingCreator:
         self.generate_caps()
 
         self.generate_hallways()
-
+        print(self.cap_mappings)
+        print(self.hallway_mappings)
 
         return {
 

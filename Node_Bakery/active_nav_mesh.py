@@ -12,7 +12,7 @@ class ActiveNavMesh:
 
         self.translation = np.asarray(
             translation,
-            dtype=float
+            dtype=np.float64
         )
 
 
@@ -20,7 +20,7 @@ class ActiveNavMesh:
             nav_data.vertices.copy()
             +
             self.translation
-        )
+        ).astype(np.float64)
 
         self.node_key = nav_data.node_key
 
@@ -86,9 +86,9 @@ class ActiveTriangle:
             self.id
         )
 
-        self.vertex_indices = nav_triangle.vertex_indices.copy()
-        self.normal = nav_triangle.normal.copy()
-        self.center = nav_triangle.center.copy() + translation
+        self.vertex_indices = nav_triangle.vertex_indices.copy().astype(np.float64)
+        self.normal = nav_triangle.normal.copy().astype(np.float64)
+        self.center = (nav_triangle.center.copy() + translation).astype(np.float64)
 
         # runtime references
         self.neighbors = []

@@ -7,21 +7,21 @@ class MeshInstance:
     def __init__(
         self,
         asset,
-        position=np.zeros(3),
+        position=np.zeros(3, dtype=np.float64),
         rotation=None,
         asset_type=None
     ):
 
         self.asset = asset
         self.asset_type = asset_type
-
+        
         self.position = np.asarray(
             position,
-            dtype=float
+            dtype=np.float64
         )
 
         self.rotation = (
-            np.eye(3)
+            np.eye(3, dtype = np.float64)
             if rotation is None
             else rotation
         )
@@ -44,7 +44,7 @@ class MeshInstance:
                 self.rotation @ v + self.position
                 for v in self.asset.vertices
             ],
-            dtype=float
+            dtype=np.float64
         )
 
 
@@ -59,7 +59,7 @@ class MeshInstance:
                     self.vertices[i]
                     for i in ids
                 ],
-                dtype=float
+                dtype=np.float64
             )
 
 
@@ -75,7 +75,8 @@ class MeshInstance:
                     "normal": normal,
                     "center": np.mean(
                         points,
-                        axis=0
+                        axis=0, 
+                        dtype=np.float64
                     )
                 }
             )
@@ -87,7 +88,7 @@ class MeshInstance:
         points
     ):
 
-        normal = np.zeros(3)
+        normal = np.zeros(3, dtype=np.float64)
 
 
         for i in range(

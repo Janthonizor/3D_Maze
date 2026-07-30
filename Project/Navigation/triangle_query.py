@@ -9,12 +9,9 @@ class TriangleQuery:
         self.visited = None
         self.cache = None
 
-    
 
     def get_cache(self, root_triangle, max_depth):
-        assert isinstance(max_depth, int), (
-            f"max_depth must be int, got {type(max_depth)}: {max_depth}"
-        )
+
         if root_triangle != self.cache_root:
 
             self.build_new_cache(root_triangle, max_depth)

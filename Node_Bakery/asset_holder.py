@@ -89,21 +89,21 @@ class AssetHolder:
             [1,0,0],
             [0,np.cos(x),-np.sin(x)],
             [0,np.sin(x), np.cos(x)]
-        ])
+        ], dtype=np.float64)
 
 
         Ry = np.array([
             [ np.cos(y),0,np.sin(y)],
             [0,1,0],
             [-np.sin(y),0,np.cos(y)]
-        ])
+        ], dtype=np.float64)
 
 
         Rz = np.array([
             [np.cos(z),-np.sin(z),0],
             [np.sin(z), np.cos(z),0],
             [0,0,1]
-        ])
+        ],dtype=np.float64)
 
 
         return Rz @ Ry @ Rx

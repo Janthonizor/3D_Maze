@@ -85,7 +85,7 @@ class NodeBuilder:
 
                         self.assets.hallway_asset,
 
-                        position=np.array(direction)*1.5,
+                        position=np.array(direction, dtype=np.float64)*1.5,
 
                         rotation=self.assets.hallway_rotations[direction],
 
@@ -103,7 +103,7 @@ class NodeBuilder:
 
                         self.assets.cap_asset,
 
-                        position=np.array(direction)*1.5,
+                        position=np.array(direction, dtype=np.float64)*1.5,
 
                         rotation=self.assets.cap_rotations[direction],
 
@@ -117,7 +117,7 @@ class NodeBuilder:
         return instances
 
 
-
+    """
     def weld_instances(
         self,
         instances,
@@ -227,7 +227,7 @@ class NodeBuilder:
                     new_tri
                 )
 
-
+        
         return (
 
             np.array(
@@ -238,6 +238,8 @@ class NodeBuilder:
             triangles
 
         )
+    """
+
 
 
 

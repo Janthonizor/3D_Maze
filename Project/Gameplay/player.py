@@ -1,4 +1,6 @@
 import numpy as np
+from collections import deque
+
 
 class Player:
 
@@ -13,20 +15,27 @@ class Player:
 
         self.current_tri = (start_mesh_id, start_triangle_id)
 
-        self.move_speed = 0.7
+        self.move_speed = 20
 
-        self.turn_speed = 80
+        self.turn_speed = 400
+
+        self.forward_n = 0.7
+
+        self.up_n = 0.2
         
         self.barycentric = np.asarray(start_bary, dtype = float)
 
-        self.bary_epsilon = 1e-4
+        self.bary_epsilon = 1e-6
 
+        self.movement_epsilon = 1e-4
         self.position = None
 
         self.up = None
+
         self.previous_up = None
  
         self.forward = None
+
         self.previous_forward = None
 
         self.velocity = np.zeros(3, dtype = np.float32)
@@ -41,6 +50,11 @@ class Player:
 
         self.previous_forward_frame = None
         self.current_forward_frame = None
+
+        # debugging
+
+        self.movement_history = deque(maxlen = 20)
+        self.triangle_bary_log = deque(maxlen = 20)
 
 
 
@@ -125,7 +139,7 @@ class Player:
 
         target /= length
 
-        up_alpha = 0.15
+        up_alpha = (self.up_n * self.move_speed) / (1 + self.up_n * self.move_speed)
 
         self.up = self.smooth_vector(
             self.previous_up,
@@ -153,7 +167,7 @@ class Player:
 
         target /= length
 
-        alpha = 0.5
+        alpha = (self.forward_n * self.move_speed) / (1 + self.forward_n * self.move_speed)
 
         self.forward = self.smooth_vector(
             self.previous_forward,
@@ -225,7 +239,8 @@ class Player:
             if bary_delta[i] < 0:
 
                 exit_fraction = (
-                    -self.barycentric[i] /
+                    -self.barycentric[i]
+                    /
                     bary_delta[i]
                 )
 
@@ -234,7 +249,23 @@ class Player:
                     exit_fraction
                 )
 
-        return distance * fraction
+
+        exit_bary = (
+            self.barycentric +
+            bary_delta * fraction
+        )
+
+
+        exit_bary = self.clean_bary(
+            exit_bary,
+            self.bary_epsilon
+        )
+
+
+        exit_distance = distance * fraction
+
+
+        return exit_distance, exit_bary
 
 
     def step_current_triangle(self, distance):
@@ -263,9 +294,12 @@ class Player:
             np.all(end_bary <= 1 + self.bary_epsilon)
         ):
 
-            self.position = end
+            self.barycentric = self.clean_bary(end_bary, self.bary_epsilon)
 
-            self.barycentric = end_bary
+            self.position = self.triangle_query.barycentric_to_world(
+                self.barycentric,
+                self.current_tri
+            )
 
             return distance, False
 
@@ -273,22 +307,18 @@ class Player:
         # we crossed a boundary
 
         # find maximum valid distance in this triangle
+        # keep bary as the primary source of truth
 
-        valid_distance = self.find_exit_distance(
+        valid_distance, edge_bary = self.find_exit_distance(
             distance,
             projected_forward,
             self.current_tri
         )
 
+        self.barycentric = edge_bary
 
-        self.position = (
-            start +
-            projected_forward * valid_distance
-        )
-
-        # not sure we need this but safe for now
-        self.barycentric = self.triangle_query.world_to_barycentric(
-            self.position,
+        self.position = self.triangle_query.barycentric_to_world(
+            edge_bary, 
             self.current_tri
         )
 
@@ -303,6 +333,7 @@ class Player:
 
         candidates = 0
 
+        
         for connection in tri_connections:
 
             connected_tri = connection
@@ -317,6 +348,15 @@ class Player:
                 connected_tri
             )
 
+            self.triangle_bary_log.append(
+                {
+                    "current triangle": self.current_tri,
+                    "current barycentric": self.barycentric,
+                    "attempted tri": connection,
+                    "attempted bary": bary
+                }
+            )
+
             if (
                 np.all(bary >= -self.bary_epsilon)
                 and
@@ -329,7 +369,11 @@ class Player:
                 )
 
         assert False, (
-            f"No connected triangle found from {self.current_tri}"
+            f"No connected triangle found from {self.current_tri}\n"
+            + "\n".join(
+                str(entry)
+                for entry in self.triangle_bary_log
+            )
         )
 
   
@@ -339,18 +383,27 @@ class Player:
 
         counter = 0
 
-        while abs(remaining_distance) > 0:
+        while abs(remaining_distance) > self.movement_epsilon:
 
             counter+=1
 
-            assert counter <= 100, (
-                f"move_forward exceeded 100 triangle transitions. "
-                f"Triangle: {self.current_tri}, "
-                f"Remaining distance: {remaining_distance}"
-            )
-
             distance_travelled, crossed = self.step_current_triangle(
                 remaining_distance
+            )
+            self.movement_history.append(
+                {
+                    "counter": counter,
+                    "triangle": self.current_tri,
+                    "barycentric": self.barycentric.copy(),
+                    "position": self.position.copy(),
+                    "distance_travelled": distance_travelled,
+                    "crossed": crossed,
+                    "remaining_distance": remaining_distance
+                }
+            )
+
+            assert counter <= 20, (
+                str(entry) for entry in self.movement_history
             )
 
             remaining_distance -= distance_travelled
@@ -371,6 +424,21 @@ class Player:
 
         self.update_forward()
 
+
+    def clean_bary(self, bary, epsilon):
+
+        bary = bary.copy()
+
+        # remove floating point noise
+        bary[np.abs(bary) < epsilon] = 0.0
+
+        # clamp tiny negatives caused by precision
+        bary[bary < 0] = 0.0
+
+        # renormalize
+        bary /= np.sum(bary)
+
+        return bary
     
     def rotate(self, angular_velocity, dt):
         

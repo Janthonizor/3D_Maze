@@ -21,6 +21,7 @@ for i in range(64):
     vertices, triangles = builder.build_node(
         i
     )
+    print(i)
     mesh = NavMesh(
         i,
         vertices,

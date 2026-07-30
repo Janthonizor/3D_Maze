@@ -13,7 +13,7 @@ class NavTriangle:
         # indices into node vertex array
         self.vertex_indices = np.array(
             vertex_indices,
-            dtype=int
+            dtype=np.int32
         )
 
         # local adjacency

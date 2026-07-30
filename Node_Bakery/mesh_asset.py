@@ -54,6 +54,10 @@ class MeshAsset:
 
         self.load_obj()
 
+        self.remove_unused_vertices()
+
+        self.validate_vertices()
+
         self.build_boundary()
 
     def load_obj(self):
@@ -79,9 +83,9 @@ class MeshAsset:
                     self.vertices.append(
                         np.array(
                             [
-                                float(data[0]),
-                                float(data[1]),
-                                float(data[2])
+                                np.float64(data[0]),
+                                np.float64(data[1]),
+                                np.float64(data[2])
                             ]
                         )
                     )
@@ -102,7 +106,7 @@ class MeshAsset:
                     for section in data:
 
                         vertex_indices.append(
-                            int(section.split("/")[0]) - 1
+                            np.int32(section.split("/")[0]) - 1
                         )
 
 
@@ -130,9 +134,9 @@ class MeshAsset:
                             Triangle(
                                 triangle_id,
                                 [
-                                    vertex_indices[0],
-                                    vertex_indices[1],
-                                    vertex_indices[2]
+                                    np.int32(vertex_indices[0]),
+                                    np.int32(vertex_indices[1]),
+                                    np.int32(vertex_indices[2])
                                 ]
                             )
                         )
@@ -158,6 +162,55 @@ class MeshAsset:
         self.vertices = np.array(
             self.vertices,
             dtype=float
+        )
+
+    def remove_unused_vertices(self):
+
+        used_vertices = set()
+
+        # collect all referenced vertices
+        for tri in self.triangles:
+            for vertex_id in tri.vertex_indices:
+                used_vertices.add(vertex_id)
+
+
+        used_vertices = sorted(used_vertices)
+
+
+        # old index -> new index
+        vertex_map = {
+            old_id: new_id
+            for new_id, old_id in enumerate(used_vertices)
+        }
+
+
+        # rebuild vertex array
+        self.vertices = self.vertices[
+            used_vertices
+        ]
+
+
+        # remap triangles
+        for tri in self.triangles:
+
+            tri.vertex_indices = np.array(
+                [
+                    vertex_map[i]
+                    for i in tri.vertex_indices
+                ],
+                dtype=int
+            )
+
+    def validate_vertices(self):
+
+        used = set()
+
+        for tri in self.triangles:
+            used.update(tri.vertex_indices)
+
+        assert len(used) == len(self.vertices), (
+            f"Unused vertices remain: "
+            f"{len(self.vertices)-len(used)}"
         )
 
     def build_boundary(self):

@@ -13,7 +13,7 @@ class NavMesh:
 
         self.node_key = np.int16(node_key)
 
-        self.vertices = np.asarray(vertices, dtype=np.float32)
+        self.vertices = np.asarray(vertices, dtype=np.float64)
 
         self.triangles = [
             NavTriangle(
@@ -26,12 +26,12 @@ class NavMesh:
 
         self.tri_normals = np.zeros(
             (num_triangles, 3),
-            dtype=np.float32
+            dtype=np.float64
         )
 
         self.tri_centers = np.zeros(
             (num_triangles, 3),
-            dtype=np.float32
+            dtype=np.float64
         )
         self.boundary_triangle_indices = np.zeros(num_triangles, dtype = np.uint16)
 
@@ -52,7 +52,9 @@ class NavMesh:
         
         self.boundary_edges = []
 
-        self.vertex_normals = np.zeros_like(self.vertices)
+        self.vertex_normals = np.zeros_like(self.vertices, dtype=np.float64)
+
+        self.validate_vertices()
 
         self.build_adjacency()
 
@@ -65,6 +67,29 @@ class NavMesh:
         self.get_boundary_triangles()
 
         self.build_tri_connections()
+
+
+    def validate_vertices(self):
+
+        referenced_vertices = set()
+
+        for tri in self.triangles:
+            referenced_vertices.update(
+                tri.vertex_indices
+            )
+
+        all_vertices = set(
+            range(len(self.vertices))
+        )
+
+        unused_vertices = (
+            all_vertices -
+            referenced_vertices
+        )
+
+        assert not unused_vertices, (
+            f"Unused vertices found: {unused_vertices}"
+        )
 
     def build_adjacency(self):
 
@@ -137,15 +162,15 @@ class NavMesh:
             # get triangle vertices
             v0 = self.vertices[
                 tri.vertex_indices[0]
-            ]
+            ].astype(np.float64)
 
             v1 = self.vertices[
                 tri.vertex_indices[1]
-            ]
+            ].astype(np.float64)
 
             v2 = self.vertices[
                 tri.vertex_indices[2]
-            ]
+            ].astype(np.float64)
 
 
             # edge vectors
@@ -164,11 +189,9 @@ class NavMesh:
                 normal
             )
 
-
-            if length > 0:
-
-                normal /= length
-
+            #assert length > 1e-12, (
+                #f"Degenerate triangle: {index}"
+            #)
 
             tri.normal = normal
 
@@ -178,7 +201,7 @@ class NavMesh:
                 v0 +
                 v1 +
                 v2
-            ) * np.float32(1/3)
+            )/3.0
             tri.center = center
 
             self.tri_normals[index] = normal
@@ -195,6 +218,7 @@ class NavMesh:
             for vertex_id in tri.vertex_indices:
 
                 self.vertex_normals[vertex_id] += tri.normal
+        
 
         for i in range(len(self.vertex_normals)):
 
@@ -202,8 +226,10 @@ class NavMesh:
                 self.vertex_normals[i]
             )
 
-            if length > 0:
-
+            #assert length > 1e-12, (
+                #f"Invalid vertex normal: {i}"
+            #)
+            if length > 0.001:
                 self.vertex_normals[i] /= length
 
     def get_boundary_triangles(self):
@@ -368,14 +394,14 @@ class NavMesh:
         ]
 
         return NavData(
-            self.node_key,
-            self.vertices,
-            self.vertex_normals,
-            tri_vertex_indices,
-            self.tri_normals,
-            self.tri_centers,
-            self.tri_connections,
-            self.boundary_triangles
+            self.node_key.astype(np.int32),
+            self.vertices.astype(np.float64),
+            self.vertex_normals.astype(np.float64),
+            tri_vertex_indices.astype(np.int32),
+            self.tri_normals.astype(np.float64),
+            self.tri_centers.astype(np.float64),
+            self.tri_connections.astype(np.int32),
+            self.boundary_triangles.astype(np.int32)
 
         )
 
@@ -387,9 +413,7 @@ def sort_boundary_loop(triangles, loop_id):#
 
     for tri in triangles:
 
-        n = tri.normal / np.linalg.norm(
-            tri.normal
-        )
+        n = tri.normal
 
         if loop_id in (0, 1):
             # around X 

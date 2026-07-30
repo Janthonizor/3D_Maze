@@ -1,5 +1,5 @@
 import numpy as np
-import math
+
 
 class Camera:
 
@@ -11,9 +11,9 @@ class Camera:
 
         self.yaw = 0.0
         self.pitch = 20.0
+
         self.target_yaw = self.yaw
         self.target_pitch = self.pitch
-
 
 
         # pitch limits
@@ -23,26 +23,19 @@ class Camera:
 
         # radius constraints
 
-        self.max_radius = 0.5
-        self.min_radius = 0.1
-
-        self.radius = self.max_radius
-        self.target_radius = self.max_radius
-
-        self.radius_padding = 0.1
-        self.radius_smooth_speed = 10.0
-
+        self.radius = 0.5
 
         # controls
 
-        self.yaw_speed = 90.0
-        self.pitch_speed = 90.0
+        self.yaw_speed = 80.0
+        self.pitch_speed = 80.0
 
 
         # camera offset
 
         self.height_offset = 0.6
-        self.look_distance = 1.0
+        
+        self.look_distance = 0.5
 
         self.orbit_direction = None
 
@@ -60,6 +53,8 @@ class Camera:
             [0,0,1],
             dtype=float
         )
+
+        self.right = np.array([0,0,0], dtype=float)
 
         self.player_position = np.zeros(3)
 
@@ -89,29 +84,22 @@ class Camera:
 
             position, up, forward = player_frame
 
-
             self.player_position = (
                 np.asarray(position)
             )
 
+            self.player_up = up
 
-            self.player_up = (
-                up /
-                np.linalg.norm(up)
-            )
-
-
-            self.player_forward = (
-                forward /
-                np.linalg.norm(forward)
-            )
-
+            self.player_forward  = forward
 
             self.solve_camera()
+
             self.current_position_frame = self.position.copy()
             self.previous_position_frame = self.position.copy()
+
             self.current_up_frame = self.up.copy()
             self.previous_up_frame = self.up.copy()
+
             self.previous_forward_frame = self.forward.copy()
             self.current_forward_frame = self.forward.copy()
 
@@ -121,7 +109,7 @@ class Camera:
         input_state,
         dt
     ):
-        sensitivity = 0.15
+        sensitivity = 0.18
 
         self.target_yaw -= (
             input_state["mouse_dx"] * sensitivity
@@ -129,6 +117,7 @@ class Camera:
         self.target_pitch -=(
             input_state["mouse_dy"] * sensitivity
         )
+
         self.target_pitch = np.clip(
             self.target_pitch,
             self.min_pitch,
@@ -160,11 +149,8 @@ class Camera:
 
     def update_frame(
         self,
-        player_frame,
-        dt
+        player_frame
     ):
-
-
 
         position, up, forward = player_frame
 
@@ -173,18 +159,15 @@ class Camera:
             np.asarray(position)
         )
 
-
         self.player_up = (
             up /
             np.linalg.norm(up)
         )
 
-
         self.player_forward = (
             forward /
             np.linalg.norm(forward)
         )
-
 
         self.solve_camera()
 
@@ -198,13 +181,9 @@ class Camera:
 
     def solve_camera_position(self):
 
-        up = self.player_up / np.linalg.norm(
-            self.player_up
-        )
+        up = self.player_up
 
-        forward = self.player_forward / np.linalg.norm(
-            self.player_forward
-        )
+        forward = self.player_forward
 
 
         # start behind player
@@ -240,10 +219,7 @@ class Camera:
 
     def solve_camera_orientation(self):
 
-        up = (
-            self.player_up /
-            np.linalg.norm(self.player_up)
-        )
+        up = self.player_up 
 
         forward = (
             self.player_position -
@@ -258,8 +234,6 @@ class Camera:
             forward,
             up
         )
-
-        right /= np.linalg.norm(right)
 
 
         # apply pitch around camera right axis
@@ -283,314 +257,12 @@ class Camera:
 
         self.forward = forward
         self.up = up
+        self.right = right
 
         self.look_at = (
             self.position +
             forward *
             self.look_distance
-        )
-
-
-    def update_radius(
-        self,
-        dt
-    ):
-
-        if abs(
-            self.radius -
-            self.target_radius
-        ) < 1e-4:
-
-            return
-
-
-        alpha = 1.0 - np.exp(
-            -self.radius_smooth_speed * dt
-        )
-
-
-        self.radius = (
-            (1-alpha)
-            *
-            self.radius
-            +
-            alpha
-            *
-            self.target_radius
-        )
-
-
-    def solve_collision(
-        self,
-        collision_meshes,
-        dt
-    ):
-
-        start = (
-            self.player_position
-            +
-            self.player_up * self.height_offset
-        )
-
-
-        # -------------------------
-        # Camera basis
-        # -------------------------
-
-        forward = (
-            self.position - start
-        )
-
-        distance = np.linalg.norm(
-            forward
-        )
-
-        if distance == 0:
-            return
-
-
-        forward /= distance
-
-
-        up = (
-            self.up /
-            np.linalg.norm(self.up)
-        )
-
-
-        right = np.cross(
-            forward,
-            up
-        )
-
-        right /= np.linalg.norm(
-            right
-        )
-
-
-        camera_direction = (
-            self.position - start
-        )
-
-        camera_direction /= np.linalg.norm(
-            camera_direction
-        )
-
-
-        # -------------------------
-        # Create collision rays
-        # -------------------------
-
-        center_point = (
-            start +
-            camera_direction * self.max_radius
-        )
-
-
-        offset = 0.35
-
-
-        camera_points = [
-
-            # center
-
-            center_point,
-
-
-            # top
-
-            center_point +
-            up * offset,
-
-
-            # bottom
-
-            center_point -
-            up * offset,
-
-
-            # left
-
-            center_point -
-            right * offset,
-
-
-            # right
-
-            center_point +
-            right * offset
-
-        ]
-
-
-        # -------------------------
-        # Ray distances
-        # -------------------------
-
-        hit_distances = (
-            np.ones(5) *
-            self.max_radius
-        )
-
-
-        # -------------------------
-        # Ray trace
-        # -------------------------
-
-        for ray_id, point in enumerate(camera_points):
-
-            direction = (
-                point - start
-            )
-
-            distance = np.linalg.norm(
-                direction
-            )
-
-            if distance == 0:
-                continue
-
-
-            direction /= distance
-
-
-            ray_end = (
-                start +
-                direction *
-                self.max_radius
-            )
-
-
-            for mesh, position in collision_meshes:
-
-
-                # world -> local
-                # meshes are already oriented locally
-
-                local_start = (
-                    start -
-                    position
-                )
-
-
-                local_end = (
-                    ray_end -
-                    position
-                )
-
-
-                points, cells = mesh.ray_trace(
-                    local_start,
-                    local_end
-                )
-
-
-                if len(points):
-
-                    local_hit = points[0]
-
-
-                    # local -> world
-
-                    world_hit = (
-                        local_hit +
-                        position
-                    )
-
-
-                    hit = np.linalg.norm(
-                        world_hit -
-                        start
-                    )
-
-
-                    hit_distances[ray_id] = min(
-                        hit_distances[ray_id],
-                        hit
-                    )
-
-
-        # -------------------------
-        # Update camera radius
-        # -------------------------
-
-        self.update_radius_from_collision(
-            hit_distances
-        )
-
-        self.update_radius(
-            dt
-        )
-
-        self.update_position_from_radius()
-
-
-    def update_radius_from_collision(
-        self,
-        collision_distances
-    ):
-
-        # ignore rays that reached max radius (no hit)
-        valid = [
-            d for d in collision_distances
-            if d < self.max_radius
-        ]
-
-
-        # no collisions
-        if len(valid) == 0:
-
-            self.target_radius = self.max_radius
-
-            return
-
-
-
-        # closest screen ray determines camera limit
-        closest = min(valid)
-
-
-
-        # apply safety padding
-        safe_radius = (
-            closest -
-            self.radius_padding
-        )
-
-
-        self.target_radius = np.clip(
-            safe_radius,
-            self.min_radius,
-            self.max_radius
-        )
-
-
-    def update_position_from_radius(self):
-
-        up = self.player_up / np.linalg.norm(self.player_up)
-
-        # vector from player to camera
-        offset = self.position - self.player_position
-
-        # remove vertical component
-        vertical = np.dot(offset, up) * up
-
-        horizontal = offset - vertical
-
-        horizontal_length = np.linalg.norm(horizontal)
-
-        if horizontal_length < 1e-8:
-            return
-
-        # preserve orbit direction but force radius
-        horizontal_direction = horizontal / horizontal_length
-
-        self.position = (
-            self.player_position
-            +
-            horizontal_direction * self.radius
-            +
-            up * self.height_offset
         )
 
             
