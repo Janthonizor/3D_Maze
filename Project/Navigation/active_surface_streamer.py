@@ -3,11 +3,13 @@ class ActiveSurfaceStreamer:
 
     def __init__(
         self,
-        maze_map,
+        level,
         start_node_id
     ):
 
-        self.maze_map = maze_map
+        self.level = level
+
+        self.maze_map = level.maze_map
 
         self.current_node_id = start_node_id
 
@@ -22,14 +24,9 @@ class ActiveSurfaceStreamer:
             (0,0,-1):(4,5)
         }
 
-    def create_mesh(self, node_id):
-        node = self.maze_map.get_node(node_id)
+    def get_mesh(self, node_id):
 
-        return ActiveNavMesh(
-            node.nav_data,
-            node_id,
-            node.position
-        )
+        return self.level.nav_meshes[node_id]
 
     def stitch_mesh(
         self,
@@ -89,7 +86,7 @@ class ActiveSurfaceStreamer:
 
     def initialize_active_meshes(self):
 
-        current_mesh = self.create_mesh(self.current_node_id)
+        current_mesh = self.get_mesh(self.current_node_id)
 
         self.active_meshes[self.current_node_id] = current_mesh
 
@@ -97,7 +94,7 @@ class ActiveSurfaceStreamer:
 
         for new_neighbor_id in new_neighbor_ids:
 
-            new_mesh = self.create_mesh(new_neighbor_id)
+            new_mesh = self.get_mesh(new_neighbor_id)
 
             self.stitch_mesh(
                 current_mesh,
@@ -153,9 +150,7 @@ class ActiveSurfaceStreamer:
             if neighbor_id in self.active_meshes:
                 continue
 
-            new_mesh = self.create_mesh(
-                neighbor_id
-            )
+            new_mesh = self.get_mesh(neighbor_id)
 
             self.stitch_mesh(
                 current_mesh,

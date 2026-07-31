@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QSizePolicy
 )
 
-from PyQt5.QtGui import QPalette
+from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtCore import Qt
 
 
@@ -191,7 +191,52 @@ class HUD(QWidget):
             player_frame
         )
 
+    def update_stamina(self, stamina, max_stamina, sprint_locked):
 
+        value = (
+            stamina / max_stamina
+        )
+        self.stats_panel.stamina_bar.setValue(value)
+
+        if sprint_locked:
+
+            self.stats_panel.stamina_bar.color = QColor("red")
+
+        else:
+            self.stats_panel.stamina_bar.color = self.interpolate_color(
+                value
+            )
+
+    def interpolate_color(self, percent):
+
+        # empty = red
+        low = QColor(255, 0, 0)
+
+        # full = teal
+        high = QColor(0, 220, 220)
+
+        r = int(
+            low.red()
+            +
+            (high.red() - low.red())
+            * percent
+        )
+
+        g = int(
+            low.green()
+            +
+            (high.green() - low.green())
+            * percent
+        )
+
+        b = int(
+            low.blue()
+            +
+            (high.blue() - low.blue())
+            * percent
+        )
+
+        return QColor(r,g,b)
 
     # ==================================================
     # Cleanup

@@ -1,68 +1,224 @@
 import numpy as np
+from collections import deque
 
 class TriangleQuery:
 
     def __init__(self, active_surface):
+
         self.surface = active_surface
+
         self.cache_root = None
-        self.cache_depth = None
-        self.visited = None
-        self.cache = None
+        self.cache_depth = -1
+
+        self.cache = []
+
+        # flat numpy cache
+        self.cached_keys = np.empty(0, dtype=np.int32)
+        self.cached_vertices = np.empty((0,3,3), dtype=np.float64)
+        self.cached_centers = np.empty((0,3), dtype=np.float64)
+        self.cached_normals = np.empty((0,3), dtype=np.float64)
+        self.cached_neighbors = np.empty((0,3), dtype=np.int32)
 
 
-    def get_cache(self, root_triangle, max_depth):
+    def build_cache(self, root_triangle, depth):
 
-        if root_triangle != self.cache_root:
-
-            self.build_new_cache(root_triangle, max_depth)
-
-        elif max_depth > self.cache_depth:
-
-            self.expand_cache(max_depth)
-
-        return self.cache[:max_depth + 1]
-        
-
-    def build_new_cache(self, root_triangle, max_depth):
+        if (
+            root_triangle == self.cache_root and
+            depth == self.cache_depth
+        ):
+            return
 
         self.cache_root = root_triangle
+        self.cache_depth = depth
 
-        self.cache_depth = 0
+        visited = set()
+        queue = deque([(root_triangle, 0)])
 
-        self.visited = {root_triangle}
+        triangle_keys = []
 
-        self.cache = [[root_triangle]]
+        while queue:
 
-        self.expand_cache(max_depth)
+            tri_key, level = queue.popleft()
+
+            if tri_key in visited:
+                continue
+
+            visited.add(tri_key)
+
+            mesh_id, tri_id = tri_key
+
+            mesh = self.surface.active_meshes[mesh_id]
+
+            triangle_keys.append(tri_key)
+
+            if level < depth:
+
+                neighbors = mesh.tri_connections[tri_id]
+
+                for neighbor_key in neighbors:
+
+                    if neighbor_key not in visited:
+                        queue.append(
+                            (neighbor_key, level + 1)
+                        )
+
+        self._flatten_cache(triangle_keys)
 
 
-    def expand_cache(self, target_depth):
+    def _flatten_cache(self, triangle_keys):
 
-        while self.cache_depth < target_depth:
+        n = len(triangle_keys)
 
-            next_layer = []
+        self.cached_keys = np.empty(
+            n,
+            dtype=object
+        )
 
-            for triangle in self.cache[-1]:
+        self.cached_vertices = np.empty(
+            (n,3,3),
+            dtype=np.float32
+        )
 
-                connected_triangles = self.get_tri_connections(triangle)
+        self.cached_centers = np.empty(
+            (n,3),
+            dtype=np.float32
+        )
 
-                for connected_triangle in connected_triangles:
+        self.cached_normals = np.empty(
+            (n,3),
+            dtype=np.float32
+        )
 
-                    if connected_triangle[1] < 0:
-                        continue
 
-                    if connected_triangle not in self.visited:
+        for i, key in enumerate(triangle_keys):
 
-                        self.visited.add(connected_triangle)
+            mesh_id, tri_id = key
 
-                        next_layer.append(connected_triangle)
+            mesh = self.surface.active_meshes[mesh_id]
 
-            if not next_layer:
-                break
+            self.cached_keys[i] = key
 
-            self.cache.append(next_layer)
 
-            self.cache_depth += 1
+            vertex_ids = mesh.tri_vertex_indices[tri_id]
+
+            self.cached_vertices[i] = (
+                mesh.vertices[vertex_ids]
+            )
+
+
+            self.cached_centers[i] = (
+                mesh.tri_centers[tri_id]
+            )
+
+
+            self.cached_normals[i] = (
+                mesh.vertex_normals[vertex_ids].mean(axis=0)
+            )
+
+
+    def raycast(self, cull_pos, cam_pos, direction, max_distance):
+
+        delta = self.cached_centers - cull_pos
+
+        dist_sq = np.einsum(
+            "ij,ij->i",
+            delta,
+            delta
+        )
+
+        mask = dist_sq < max_distance * max_distance
+
+        if not np.any(mask):
+            return (
+                np.empty(0, dtype=np.int32),
+                np.empty((0,3,3), dtype=np.float32),
+                np.empty(0, dtype=np.float32)
+            )
+
+
+        triangles = self.cached_vertices[mask]
+
+        ray_direction = np.broadcast_to(
+            direction,
+            triangles.shape[:2]
+        )
+
+        # -------------------------
+        # vectorized Moller-Trumbore
+        # -------------------------
+
+        v0 = triangles[:,0]
+        v1 = triangles[:,1]
+        v2 = triangles[:,2]
+
+
+        edge1 = v1 - v0
+        edge2 = v2 - v0
+
+
+        h = np.cross(
+            ray_direction,
+            edge2
+        )
+
+        a = np.einsum(
+            "ij,ij->i",
+            edge1,
+            h
+        )
+
+        valid = np.abs(a) > 1e-8
+
+        f = np.zeros_like(a)
+        f[valid] = 1.0 / a[valid]
+
+        s = cam_pos - v0
+
+        u = f * np.einsum(
+            "ij,ij->i",
+            s,
+            h
+        )
+
+        valid &= (u >= 0) & (u <= 1)
+
+        q = np.cross(
+            s,
+            edge1
+        )
+
+        v = f * np.einsum(
+            "ij,ij->i",
+            ray_direction,
+            q
+        )
+
+        valid &= (v >= 0)
+        valid &= (u + v <= 1)
+
+        t = f * np.einsum(
+            "ij,ij->i",
+            edge2,
+            q
+        )
+
+        valid &= t > 0
+        valid &= t < max_distance
+
+
+        # original cache indices
+        triangle_ids = np.where(mask)[0][valid]
+
+        # corresponding vertices
+        vertices = triangles[valid]
+
+        # corresponding distances
+        distances = t[valid]
+        normals = self.cached_normals[mask]
+
+
+        return triangle_ids, vertices, distances, normals
+
 
 
     def get_mesh(self,triangle):

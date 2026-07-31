@@ -10,7 +10,6 @@ def main():
 
     game = GameApplication()
 
-
     game.window.show()
 
     game.start()

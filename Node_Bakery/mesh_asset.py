@@ -83,9 +83,9 @@ class MeshAsset:
                     self.vertices.append(
                         np.array(
                             [
-                                np.float64(data[0]),
-                                np.float64(data[1]),
-                                np.float64(data[2])
+                                np.float32(data[0]),
+                                np.float32(data[1]),
+                                np.float32(data[2])
                             ]
                         )
                     )

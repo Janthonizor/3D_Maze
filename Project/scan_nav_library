@@ -1,0 +1,95 @@
+import pickle
+import numpy as np
+
+class NavUnpickler(pickle.Unpickler):
+
+        def find_class(
+            self,
+            module,
+            name
+        ):
+
+            if module == "nav_data":
+                module = "Assets.nav_data"
+
+            return super().find_class(
+                module,
+                name
+            )
+        
+def scan_nav_library_dtype(path):
+
+    with open(
+        "Data/nav_library.pkl",
+        "rb"
+    ) as f:
+
+        nav_library = (
+            NavUnpickler(f).load()
+        )
+
+    dtypes = {}
+
+    def scan(obj, name="root"):
+
+        if isinstance(obj, np.ndarray):
+
+            dtype = str(obj.dtype)
+
+            if dtype not in dtypes:
+                dtypes[dtype] = []
+
+            dtypes[dtype].append(
+                (
+                    name,
+                    obj.shape
+                )
+            )
+
+        elif isinstance(obj, dict):
+
+            for key, value in obj.items():
+                scan(
+                    value,
+                    f"{name}[{key}]"
+                )
+
+        elif isinstance(obj, (list, tuple)):
+
+            for i, value in enumerate(obj):
+                scan(
+                    value,
+                    f"{name}[{i}]"
+                )
+
+        elif hasattr(obj, "__dict__"):
+
+            for key, value in vars(obj).items():
+                scan(
+                    value,
+                    f"{name}.{key}"
+                )
+
+
+    scan(nav_library)
+
+
+    print("\nDtypes found:")
+
+    for dtype, entries in dtypes.items():
+
+        print(f"\n{dtype}: {len(entries)} arrays")
+
+        for name, shape in entries[:10]:
+            print(
+                f"  {name}: {shape}"
+            )
+
+        if len(entries) > 10:
+            print("  ...")
+
+
+# example
+scan_nav_library_dtype(
+    "Data/nav_library.pkl"
+)

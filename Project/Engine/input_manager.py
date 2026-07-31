@@ -69,3 +69,4 @@ class InputManager:
         self.mouse_delta = [0, 0]
 
         return delta
+    

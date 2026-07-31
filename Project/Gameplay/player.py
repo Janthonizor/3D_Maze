@@ -1,5 +1,8 @@
 import numpy as np
 from collections import deque
+import time
+from Gameplay.player_state import PlayerState
+
 
 
 class Player:
@@ -15,19 +18,22 @@ class Player:
 
         self.current_tri = (start_mesh_id, start_triangle_id)
 
-        self.move_speed = 5
+        self.move_speed = 0.7
 
-        self.turn_speed = 150
+        self.turn_radius = 0.3
+
+        self.turn_speed = self.move_speed/self.turn_radius * 180/np.pi
 
         self.forward_n = 0.7
 
-        self.up_n = 0.2
+        self.up_n = 0.15
         
         self.barycentric = np.asarray(start_bary, dtype = float)
 
         self.bary_epsilon = 1e-6
 
         self.movement_epsilon = 1e-4
+
         self.position = None
 
         self.up = None
@@ -37,6 +43,8 @@ class Player:
         self.forward = None
 
         self.previous_forward = None
+
+        self.state = PlayerState()
 
         self.velocity = np.zeros(3, dtype = np.float32)
         self.acceleration = np.zeros(3, dtype = np.float32)
@@ -55,6 +63,11 @@ class Player:
 
         self.movement_history = deque(maxlen = 20)
         self.triangle_bary_log = deque(maxlen = 20)
+
+
+        self.selection_depth = 10
+
+        self.triangle_query.build_cache(self.current_tri, self.selection_depth)
 
 
 
@@ -377,9 +390,11 @@ class Player:
         )
 
   
-    def move_forward(self, velocity, dt):
+    def move_forward(self, move_speed, dt):
+    
+        previous_tri = self.current_tri
 
-        remaining_distance = velocity * dt
+        remaining_distance = move_speed * dt
 
         counter = 0
 
@@ -402,8 +417,12 @@ class Player:
                 }
             )
 
-            assert counter <= 20, (
-                str(entry) for entry in self.movement_history
+            assert counter <= 100, (
+                f"Number of steps exceeded step limit {counter}\n"
+                + "\n".join(
+                    str(entry)
+                    for entry in self.movement_history
+                )
             )
 
             remaining_distance -= distance_travelled
@@ -423,6 +442,14 @@ class Player:
         self.update_up()
 
         self.update_forward()
+        t0 = time.perf_counter()
+        if self.current_tri != previous_tri:
+            self.triangle_query.build_cache(self.current_tri, self.selection_depth)
+        t1 = time.perf_counter()
+        if t1-t0> 0.01:
+            print("query update")
+            print("cache size: ", len(self.triangle_query.cached_vertices))
+            print(t1-t0)
 
 
     def clean_bary(self, bary, epsilon):
@@ -439,6 +466,7 @@ class Player:
         bary /= np.sum(bary)
 
         return bary
+
     
     def rotate(self, angular_velocity, dt):
         
@@ -536,6 +564,35 @@ class Player:
         }
 
 
+    def update(self, move, turn, sprint, dt):
+
+        self.state.sprinting = (
+            sprint 
+            and self.state.can_sprint()
+            and abs(move)>0
+        )
+        
+        
+
+        speed_mult = self.state.get_speed_multiplier()
+
+        move_speed = (
+            move
+            * self.move_speed
+            * speed_mult
+        )
+
+        turn_speed = (
+            turn
+            * self.turn_speed
+            * speed_mult
+        )
+
+        self.rotate(turn_speed, dt)
+        self.move_forward(move_speed, dt)
+
+        self.state.update_stamina(dt)
+    
     @staticmethod
     def smooth_vector( a, b, alpha):
 

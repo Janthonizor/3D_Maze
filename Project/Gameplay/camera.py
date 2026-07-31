@@ -8,6 +8,7 @@ class Camera:
         # --------------------
         # Camera controls
         # --------------------
+        self.mouse_sensitivity = 0.2
 
         self.yaw = 0.0
         self.pitch = 20.0
@@ -15,33 +16,24 @@ class Camera:
         self.target_yaw = self.yaw
         self.target_pitch = self.pitch
 
-
         # pitch limits
         self.min_pitch = -5.0
         self.max_pitch = 90.0
 
-
         # radius constraints
-
         self.radius = 0.5
 
         # controls
-
         self.yaw_speed = 80.0
         self.pitch_speed = 80.0
 
-
         # camera offset
-
         self.height_offset = 0.6
-        
         self.look_distance = 0.5
-
         self.orbit_direction = None
 
 
         self.position = np.zeros(3)
-
         self.look_at = np.zeros(3)
 
         self.forward = np.array(
@@ -56,17 +48,10 @@ class Camera:
 
         self.right = np.array([0,0,0], dtype=float)
 
-        self.player_position = np.zeros(3)
+        self.player_position = None
+        self.player_up = None
+        self.player_forward = None
 
-        self.player_up = np.array(
-            [0,0,1],
-            dtype=float
-        )
-
-        self.player_forward = np.array(
-            [1,0,0],
-            dtype=float
-        )
         self.previous_position_frame = None
         self.current_position_frame = self.position.copy()
 
@@ -102,20 +87,19 @@ class Camera:
 
             self.previous_forward_frame = self.forward.copy()
             self.current_forward_frame = self.forward.copy()
-
+            
      
     def update_input(
         self,
         input_state,
         dt
     ):
-        sensitivity = 0.18
 
         self.target_yaw -= (
-            input_state["mouse_dx"] * sensitivity
+            input_state["mouse_dx"] * self.mouse_sensitivity
         )
         self.target_pitch -=(
-            input_state["mouse_dy"] * sensitivity
+            input_state["mouse_dy"] * self.mouse_sensitivity
         )
 
         self.target_pitch = np.clip(

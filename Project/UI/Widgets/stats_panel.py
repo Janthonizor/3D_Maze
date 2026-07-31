@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QStyleFactory
 )
+from .smooth_bar import SmoothBar
 
 from PyQt5.QtGui import QColor, QPalette
 
@@ -37,21 +38,21 @@ class StatsPanel(QWidget):
 
         layout = QVBoxLayout()
 
-        self.health = self.create_bar(
+        self.health, self.health_bar = self.create_bar(
             "Health",
-            100,
+            1000,
             "red"
         )
 
-        self.hunger = self.create_bar(
+        self.hunger, self.hunger_bar = self.create_bar(
             "Hunger",
-            85,
+            1000,
             "orange"
         )
 
-        self.stamina = self.create_bar(
+        self.stamina, self.stamina_bar = self.create_bar(
             "Stamina",
-            100,
+            1000,
             "cyan"
         )
 
@@ -96,48 +97,12 @@ class StatsPanel(QWidget):
         # Progress Bar
         # --------------------------------------------------
 
-        bar = QProgressBar()
-
-        bar.setStyle(
-            QStyleFactory.create("Fusion")
-        )
-
-        bar.setRange(
-            0,
-            100
-        )
+        bar = SmoothBar(color)
 
         bar.setValue(
             value
         )
-
-        bar.setTextVisible(
-            False
-        )
-
-        palette = bar.palette()
-
-        palette.setColor(
-            QPalette.Highlight,
-            QColor(color)
-        )
-
-        palette.setColor(
-            QPalette.Active,
-            QPalette.Highlight,
-            QColor(color)
-        )
-
-        palette.setColor(
-            QPalette.Inactive,
-            QPalette.Highlight,
-            QColor(color)
-        )
-
-        bar.setPalette(
-            palette
-        )
-
+    
         # --------------------------------------------------
         # Label
         # --------------------------------------------------
@@ -172,4 +137,4 @@ class StatsPanel(QWidget):
             label
         )
 
-        return layout
+        return layout, bar

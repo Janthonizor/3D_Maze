@@ -13,7 +13,7 @@ class NavMesh:
 
         self.node_key = np.int16(node_key)
 
-        self.vertices = np.asarray(vertices, dtype=np.float64)
+        self.vertices = np.asarray(vertices, dtype=np.float32)
 
         self.triangles = [
             NavTriangle(
@@ -26,12 +26,12 @@ class NavMesh:
 
         self.tri_normals = np.zeros(
             (num_triangles, 3),
-            dtype=np.float64
+            dtype=np.float32
         )
 
         self.tri_centers = np.zeros(
             (num_triangles, 3),
-            dtype=np.float64
+            dtype=np.float32
         )
         self.boundary_triangle_indices = np.zeros(num_triangles, dtype = np.uint16)
 
@@ -52,7 +52,7 @@ class NavMesh:
         
         self.boundary_edges = []
 
-        self.vertex_normals = np.zeros_like(self.vertices, dtype=np.float64)
+        self.vertex_normals = np.zeros_like(self.vertices, dtype=np.float32)
 
         self.validate_vertices()
 
@@ -67,7 +67,6 @@ class NavMesh:
         self.get_boundary_triangles()
 
         self.build_tri_connections()
-
 
     def validate_vertices(self):
 
@@ -87,8 +86,29 @@ class NavMesh:
             referenced_vertices
         )
 
-        assert not unused_vertices, (
-            f"Unused vertices found: {unused_vertices}"
+        # --------------------------------------------------
+        # Validation
+        # --------------------------------------------------
+
+        assert len(unused_vertices) == 0, (
+            f"Unused vertices remain: {len(unused_vertices)}"
+        )
+
+        max_index = max(
+            referenced_vertices
+        )
+
+        assert max_index < len(self.vertices), (
+            f"Triangle references vertex {max_index}, "
+            f"but only {len(self.vertices)} vertices exist"
+        )
+
+        min_index = min(
+            referenced_vertices
+        )
+
+        assert min_index >= 0, (
+            f"Negative vertex index found: {min_index}"
         )
 
     def build_adjacency(self):
@@ -162,15 +182,15 @@ class NavMesh:
             # get triangle vertices
             v0 = self.vertices[
                 tri.vertex_indices[0]
-            ].astype(np.float64)
+            ].astype(np.float32)
 
             v1 = self.vertices[
                 tri.vertex_indices[1]
-            ].astype(np.float64)
+            ].astype(np.float32)
 
             v2 = self.vertices[
                 tri.vertex_indices[2]
-            ].astype(np.float64)
+            ].astype(np.float32)
 
 
             # edge vectors
@@ -394,14 +414,14 @@ class NavMesh:
         ]
 
         return NavData(
-            self.node_key.astype(np.int32),
-            self.vertices.astype(np.float64),
-            self.vertex_normals.astype(np.float64),
-            tri_vertex_indices.astype(np.int32),
-            self.tri_normals.astype(np.float64),
-            self.tri_centers.astype(np.float64),
-            self.tri_connections.astype(np.int32),
-            self.boundary_triangles.astype(np.int32)
+            self.node_key,
+            self.vertices,
+            self.vertex_normals,
+            tri_vertex_indices,
+            self.tri_normals,
+            self.tri_centers,
+            self.tri_connections,
+            self.boundary_triangles
 
         )
 

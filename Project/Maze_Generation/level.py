@@ -1,4 +1,5 @@
 from .maze_gen import generate_maze
+from Navigation.active_nav_mesh import ActiveNavMesh
 import numpy as np
 import colorsys
 import vtk
@@ -21,6 +22,8 @@ class Level:
         self.seed = seed
 
         self.maze_map = None
+
+        self.nav_meshes = {}
 
         self.generate()
 
@@ -159,9 +162,22 @@ class Level:
             node.mesh_actor = actor
             node.edge_actor = edge_actor
 
-    def assign_nav_data(self,assets):
+    def assign_nav_meshes(self, assets):
+
+        self.nav_meshes = {}
+
         for node in self.maze_map.nodes.values():
-            node.nav_data = assets.nav_library[node.type_id]
+
+            nav_mesh = ActiveNavMesh(
+                assets.nav_library[node.type_id],
+                node.id,
+                node.position
+            )
+
+            node.nav_mesh = nav_mesh
+            self.nav_meshes[node.id] = nav_mesh
+
+            
             
 
     @staticmethod

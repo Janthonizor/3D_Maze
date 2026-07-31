@@ -85,7 +85,7 @@ class NodeBuilder:
 
                         self.assets.hallway_asset,
 
-                        position=np.array(direction, dtype=np.float64)*1.5,
+                        position=np.array(direction, dtype=np.float32)*1.5,
 
                         rotation=self.assets.hallway_rotations[direction],
 
@@ -103,7 +103,7 @@ class NodeBuilder:
 
                         self.assets.cap_asset,
 
-                        position=np.array(direction, dtype=np.float64)*1.5,
+                        position=np.array(direction, dtype=np.float32)*1.5,
 
                         rotation=self.assets.cap_rotations[direction],
 
@@ -117,7 +117,7 @@ class NodeBuilder:
         return instances
 
 
-    """
+
     def weld_instances(
         self,
         instances,
@@ -230,15 +230,18 @@ class NodeBuilder:
         
         return (
 
-            np.array(
+            np.asarray(
                 vertices,
-                dtype=float
+                dtype=np.float32
             ),
 
-            triangles
+            np.asarray(
+                triangles,
+                dtype = np.int32
+            )
 
         )
-    """
+
 
 
 
@@ -253,7 +256,84 @@ class NodeBuilder:
         )
 
 
-        return self.weld_instances(
+        vertices, triangles = self.weld_instances(
             instances,
             key
         )
+
+        cvert, ctri = self.remove_unused_vertices(vertices, triangles)
+
+
+        used = np.zeros(
+            len(cvert),
+            dtype=bool
+        )
+
+        used[ctri] = True
+
+        unused_indices = np.where(
+            ~used
+        )[0]
+
+        print(
+            "Total vertices:",
+            len(cvert)
+        )
+
+        print(
+            "Used vertices:",
+            np.sum(used)
+        )
+
+        print(
+            "Unused vertices:",
+            len(unused_indices)
+        )
+
+        print(
+            "Unused indices:"
+        )
+
+        print(
+            unused_indices
+        )
+        
+
+        return cvert, ctri
+
+    def remove_unused_vertices(
+        self,
+        vertices,
+        triangles
+    ):
+
+        assert len(vertices) > 0, "No vertices before cleanup"
+        assert len(triangles) > 0, "No triangles before cleanup"
+
+        used = np.zeros(
+            len(vertices),
+            dtype=bool
+        )
+
+        used[triangles] = True
+
+        assert np.any(used), "No vertices referenced by triangles"
+
+        remap = np.full(
+            len(vertices),
+            -1,
+            dtype=np.int32
+        )
+
+        remap[used] = np.arange(
+            np.sum(used),
+            dtype=np.int32
+        )
+
+        triangles = remap[triangles]
+        vertices = vertices[used]
+
+        assert len(vertices) > 0, "Cleanup deleted all vertices"
+        assert triangles.max() < len(vertices)
+
+        return vertices, triangles   

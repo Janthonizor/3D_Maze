@@ -71,7 +71,7 @@ class LevelLoader(QObject):
                 return
 
 
-            level.assign_nav_data(
+            level.assign_nav_meshes(
                 self.assets
             )
             self.progress.emit(

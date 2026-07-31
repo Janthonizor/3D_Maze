@@ -211,7 +211,7 @@ class Renderer:
 
         self.plotter.camera.up = camera_up
 
-        self.plotter.camera.view_angle = 110
+        self.plotter.camera.view_angle = 100
 
     def add_all_actors(self):
 
@@ -249,28 +249,31 @@ class Renderer:
         self,
         raycast_result
     ):
-        
+
+        triangle_ids, vertices, distances, normals = raycast_result
+
+
         # -------------------------
         # No selection
         # -------------------------
 
-        if raycast_result is None:
+        if len(triangle_ids) == 0:
 
             if self.selected_triangle_actor is not None:
-
                 self.selected_triangle_actor.VisibilityOff()
 
             return
 
-        triangle_key = raycast_result[0]
 
-        if (
-            triangle_key == self.selected_triangle_key
-            and self.selected_triangle_actor is not None
-            and self.selected_triangle_actor.GetVisibility()
-        ):  
-            return
-        
+        # closest hit
+        best = np.argmin(distances)
+
+        triangle_key = triangle_ids[best]
+
+        adjust_direction = normals[best]
+
+        vertices = vertices[best]+adjust_direction*0.01
+
         # -------------------------
         # Create actor if needed
         # -------------------------
@@ -351,7 +354,6 @@ class Renderer:
                 actor
             )
 
-        vertices = raycast_result[1]
 
         
         polydata = (

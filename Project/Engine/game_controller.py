@@ -44,13 +44,13 @@ class GameController(QObject):
 
 
         self.surface = ActiveSurfaceStreamer(
-            level.maze_map,
+            level,
             self.current_node
         )
 
         self.triangle_query = None
 
-        self.physics_dt = 1.0 / 60.0
+        self.physics_dt = 1.0 / 120.0
 
         self.accumulator = 0.0
 
@@ -63,6 +63,8 @@ class GameController(QObject):
         self.timer = None
 
         self.camera_collision_timer = 0.0
+
+        self.max_physics_steps = 3
 
 
     def initialize(self):
@@ -130,7 +132,7 @@ class GameController(QObject):
 
         self.timer.timeout.connect(self.tick)
 
-        self.timer.start(16)
+        self.timer.start(8)
 
 
     def physics_step(
@@ -138,11 +140,17 @@ class GameController(QObject):
         input_state,
         dt
     ):
+
         self.player.save_previous_render_state()
 
         self.update_player(
             input_state,
             dt
+        )
+        self.window.game_screen.hud.update_stamina(
+            self.player.state.stamina,
+            self.player.state.max_stamina,
+            self.player.state.sprint_locked
         )
 
         self.player.update_render_state()
@@ -163,20 +171,18 @@ class GameController(QObject):
         self.camera.update_render_state()
 
         cam_look = self.renderer.plotter.camera.GetDirectionOfProjection()
+
         cam_pos = self.renderer.plotter.camera.position
-        
-        self.hit = raycast_surface(
-            self.triangle_query,
-            self.player.current_tri,
-            cam_pos, 
+
+        self.hit = self.triangle_query.raycast(
+            self.player.position, 
+            cam_pos,
             cam_look,
-            15,
-            6.0,
-            1.0,
-            self.player.position
+            1.5
         )
 
 
+        
     def render_step(self):
 
         self.renderer.update_frame(
@@ -200,31 +206,30 @@ class GameController(QObject):
             self.current_node,
             self.player.get_frame()
         )
+        
 
 
     def tick(self):
 
         tick_start = time.perf_counter()
 
-        current_time = tick_start
-
         frame_time = (
-            current_time
+            tick_start
             -
             self.previous_time
         )
 
-        self.previous_time = current_time
+        self.previous_time = tick_start
 
         self.accumulator += frame_time
 
         input_state = self.get_input()
 
-        physics_start = time.perf_counter()
-
         physics_count = 0
 
-        while self.accumulator >= self.physics_dt:
+        while (self.accumulator >= self.physics_dt
+            and physics_count < self.max_physics_steps
+        ):
 
             self.physics_step(
                 input_state,
@@ -234,11 +239,6 @@ class GameController(QObject):
             self.accumulator -= self.physics_dt
             physics_count += 1
 
-        physics_time = (
-            time.perf_counter()
-            -
-            physics_start
-        )
 
         self.alpha = (
             self.accumulator
@@ -246,27 +246,12 @@ class GameController(QObject):
             self.physics_dt
         )
 
-        render_start = time.perf_counter()
 
         self.render_step()
 
-        render_time = (
-            time.perf_counter()
-            -
-            render_start
-        )
 
-        tick_time = (
-            time.perf_counter()
-            -
-            tick_start
-        )
 
-        print(
-            f"Tick {tick_time*1000:.2f}ms | "
-            f"Physics {physics_count}x {physics_time*1000:.2f}ms | "
-            f"Render {render_time*1000:.2f}ms"
-        )
+
 
     def get_input(self):
 
@@ -288,6 +273,9 @@ class GameController(QObject):
             "right":
                 self.input_manager.down(Qt.Key_D),
 
+            "sprint":
+                self.input_manager.down(Qt.Key_Shift),
+
             "mouse_dx":
                 mouse_dx,
 
@@ -296,65 +284,81 @@ class GameController(QObject):
         }
 
 
-    def update_player(
-        self,
-        input_state,
-        dt
-    ):
+    def update_player(self, input_state, dt):
 
+        move = 0
+        turn = 0
 
         if input_state["forward"]:
-
-            self.player.move_forward(
-                self.player.move_speed,
-                dt
-            )
-
+            move += 1
 
         if input_state["back"]:
-
-            self.player.move_forward(
-                -self.player.move_speed,
-                dt
-            )
-
+            move -= 1
 
         if input_state["left"]:
-
-            self.player.rotate(
-                self.player.turn_speed,
-                dt
-            )
-
+            turn += 1
 
         if input_state["right"]:
+            turn -= 1
 
-            self.player.rotate(
-                -self.player.turn_speed,
-                dt
-            )
+        sprint = input_state["sprint"]
+
+        self.player.update(
+            move=move,
+            turn=turn,
+            sprint=sprint,
+            dt=dt
+        )
 
 
     def update_surface(self):
 
-        new_node = self.player.get_node_id()
+        start = time.perf_counter()
 
+        new_node = self.player.get_node_id()
 
         if new_node == self.current_node:
             return
 
 
+        update_start = time.perf_counter()
+
         self.surface.update_active_meshes(
             new_node
         )
 
+        update_time = time.perf_counter() - update_start
+
+
         self.current_node = new_node
 
 
+        visible_start = time.perf_counter()
+
         self.get_visible_nodes()
+
+        visible_time = time.perf_counter() - visible_start
+
+
+        renderer_start = time.perf_counter()
 
         self.update_renderer_visibility()
 
+        renderer_time = time.perf_counter() - renderer_start
+
+
+        total_time = time.perf_counter() - start
+
+
+        if total_time > 0.010:
+            print(
+                f"""
+    Surface update spike: {total_time*1000:.2f} ms
+        update_active_meshes: {update_time*1000:.2f} ms
+        get_visible_nodes:     {visible_time*1000:.2f} ms
+        renderer_visibility:   {renderer_time*1000:.2f} ms
+    """
+            )
 
     def get_visible_nodes(self):
 
